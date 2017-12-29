@@ -282,6 +282,161 @@ class SVDRegister(SVDElement):
         return 'reserved' in self.name.lower()
 
 
+class SVDCluster(SVDElement):
+    def __init__(self, name, description, address_offset, derived_from, alternate_cluster, struct_name,
+                 size, access, protection, reset_value, reset_mask, 
+                 registers, register_arrays, clusters, cluster_arrays):
+        SVDElement.__init__(self)
+
+        # When deriving a cluster, it is mandatory to specify at least the name, the description,
+        # and the addressOffset
+        self.derived_from = derived_from
+        self.name = name
+        self.description = description
+        self.address_offset = address_offset
+
+        self._alternate_cluster = alternate_cluster
+        self._struct_name = struct_name
+        self._size = size
+        self._access = access
+        self._protection = protection
+        self._reset_value = reset_value
+        self._reset_mask = reset_mask
+        self._registers = registers
+        self._register_arrays = register_arrays
+        self._clusters = clusters
+        self._cluster_arrays = cluster_arrays
+
+        # make parent association
+        for register in self._registers:
+            register.parent = self
+        
+        for arr in self._register_arrays:
+            arr.parent = self
+            
+        for cluster in self._clusters:
+            cluster.parent = self
+            
+        for arr in self._cluster_arrays:
+            arr.parent = self
+
+    def __getattr__(self, attr):
+        return self._lookup_possibly_derived_attribute(attr)
+
+    @property
+    def registers(self):
+        regs = []
+        for reg in self._lookup_possibly_derived_attribute('registers'):
+            regs.append(reg)
+        for arr in self._lookup_possibly_derived_attribute('register_arrays'):
+            regs.extend(arr.registers)
+        return regs
+
+    @property
+    def clusters(self):
+        clusters = []
+        for cluster in self._lookup_possibly_derived_attribute('clusters'):
+            clusters.append(cluster)
+        for arr in self._lookup_possibly_derived_attribute('cluster_arrays'):
+            clusters.extend(arr.clusters)
+        return clusters
+            
+    def get_derived_from(self):
+        # TODO: add support for dot notation derivedFrom
+        if self.derived_from is None:
+            return None
+
+        for cluster in self.parent.clusters:
+            if cluster.name == self.derived_from:
+                return cluster
+
+        raise KeyError("Unable to find derived_from: %r" % self.derived_from)
+
+    def is_reserved(self):
+        return 'reserved' in self.name.lower()
+    
+    
+class SVDClusterArray(SVDElement):
+    """Represent a cluster array in the tree"""
+
+    def __init__(self, name, description, address_offset, derived_from, dim, dim_indices, dim_increment,
+                 alternate_cluster, struct_name, size, access, protection, reset_value, reset_mask,
+                 registers, register_arrays, clusters, cluster_arrays):
+        SVDElement.__init__(self)
+
+        # When deriving a cluster, it is mandatory to specify at least the name, the description,
+        # and the addressOffset
+        self.name = name
+        self.description = description
+        self.address_offset = address_offset
+        self.derived_from = derived_from
+        self.dim = dim
+        self.dim_indices = dim_indices
+        self.dim_increment = dim_increment
+
+        self._alternate_cluster = alternate_cluster
+        self._struct_name = struct_name
+        self._size = size
+        self._access = access
+        self._protection = protection
+        self._reset_value = reset_value
+        self._reset_mask = reset_mask
+        self._registers = registers
+        self._register_arrays = register_arrays
+        self._clusters = clusters
+        self._cluster_arrays = cluster_arrays
+
+        # make parent association
+        for register in self._registers:
+            register.parent = self
+        
+        for arr in self._register_arrays:
+            arr.parent = self
+            
+        for cluster in self._clusters:
+            cluster.parent = self
+            
+        for arr in self._cluster_arrays:
+            arr.parent = self
+
+    def __getattr__(self, attr):
+        return self._lookup_possibly_derived_attribute(attr)
+
+    @property
+    def clusters(self):
+        for i in six.moves.range(self.dim):
+            cluster = SVDCluster(
+                name=self.name % self.dim_indices[i],
+                description=self.description,
+                address_offset=self.address_offset + self.dim_increment * i,
+                derived_from=self.derived_from,
+                alternate_cluster=self._alternate_cluster,
+                struct_name=self._struct_name,
+                size=self._size,
+                access=self._access,
+                protection=self._protection,
+                reset_value=self._reset_value,
+                reset_mask=self._reset_mask,
+                registers=self._registers,
+                clusters=self._clusters,
+            )
+            cluster.parent = self.parent
+            yield cluster
+
+    def get_derived_from(self):
+        # TODO: add support for dot notation derivedFrom
+        if self.derived_from is None:
+            return None
+
+        for register in self.parent.registers:
+            if register.name == self.derived_from:
+                return register
+
+        raise KeyError("Unable to find derived_from: %r" % self.derived_from)
+
+    def is_reserved(self):
+        return 'reserved' in self.name.lower()
+
 class SVDAddressBlock(SVDElement):
     def __init__(self, offset, size, usage):
         SVDElement.__init__(self)
@@ -299,7 +454,8 @@ class SVDInterrupt(SVDElement):
 
 class SVDPeripheral(SVDElement):
     def __init__(self, name, version, derived_from, description, prepend_to_name, base_address, address_block,
-                 interrupts, registers, register_arrays, size, access, protection, reset_value, reset_mask,
+                 interrupts, registers, register_arrays, clusters, cluster_arrays,
+                 size, access, protection, reset_value, reset_mask,
                  group_name, append_to_name, disable_condition):
         SVDElement.__init__(self)
 
@@ -314,6 +470,8 @@ class SVDPeripheral(SVDElement):
         self._interrupts = interrupts
         self._registers = registers
         self._register_arrays = register_arrays
+        self._clusters = clusters
+        self._cluster_arrays = cluster_arrays
         self._size = size  # Defines the default bit-width of any register contained in the device (implicit inheritance).
         self._access = access  # Defines the default access rights for all registers.
         self._protection = protection  # Defines extended access protection for all registers.
@@ -328,6 +486,8 @@ class SVDPeripheral(SVDElement):
             i.parent = self
         for r in _none_as_empty(self._registers):
             r.parent = self
+        for c in _none_as_empty(self._clusters):
+            c.parent = self
 
     def __getattr__(self, attr):
         return self._lookup_possibly_derived_attribute(attr)
@@ -339,7 +499,15 @@ class SVDPeripheral(SVDElement):
             regs.append(reg)
         for arr in self._lookup_possibly_derived_attribute('register_arrays'):
             regs.extend(arr.registers)
-        return regs
+
+    @property
+    def clusters(self):
+        clusters = []
+        for cluster in self._lookup_possibly_derived_attribute('clusters'):
+            clusters.append(cluster)
+        for arr in self._lookup_possibly_derived_attribute('cluster_arrays'):
+            clusters.extend(arr.clusters)
+        return clusters
 
     def get_derived_from(self):
         if self._derived_from is None:
