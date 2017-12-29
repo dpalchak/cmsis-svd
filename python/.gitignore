@@ -62,3 +62,8 @@ docs/_build/
 
 # PyBuilder
 target/
+
+# Eclpse files
+.project
+.pydevproject
+
