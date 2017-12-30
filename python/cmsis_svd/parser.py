@@ -85,7 +85,7 @@ class SVDParser(object):
 
         filename = pkg_resources.resource_filename("cmsis_svd", resource)
         return cls.for_xml_file(filename, remove_reserved)
-    
+
     @classmethod
     def for_mcu(cls, mcu):
         mcu = mcu.lower()
@@ -126,8 +126,8 @@ class SVDParser(object):
         for enumerated_value_node in field_node.findall("./enumeratedValues/enumeratedValue"):
             enumerated_values.append(self._parse_enumerated_value(enumerated_value_node))
 
-        modified_write_values=_get_text(field_node, 'modifiedWriteValues')
-        read_action=_get_text(field_node, 'readAction')
+        modified_write_values = _get_text(field_node, 'modifiedWriteValues')
+        read_action = _get_text(field_node, 'readAction')
         bit_range = _get_text(field_node, 'bitRange')
         bit_offset = _get_int(field_node, 'bitOffset')
         bit_width = _get_int(field_node, 'bitWidth')
@@ -135,9 +135,9 @@ class SVDParser(object):
         lsb = _get_int(field_node, 'lsb')
         if bit_range is not None:
             m = re.search('\[([0-9]+):([0-9]+)\]', bit_range)
-            bit_offset = int(m.group(2))
-            bit_width = 1 + (int(m.group(1)) - int(m.group(2)))
-        elif msb is not None:
+            msb = int(m.group(1))
+            lsb = int(m.group(2))
+        if msb is not None:
             bit_offset = lsb
             bit_width = 1 + (msb - lsb)
 
@@ -232,7 +232,7 @@ class SVDParser(object):
         register_arrays = []
         clusters = []
         cluster_arrays = []
-        
+
         for register_node in cluster_node.findall('./register'):
             reg = self._parse_register(register_node)
             if isinstance(reg, SVDRegisterArray):
@@ -344,14 +344,13 @@ class SVDParser(object):
                     register_arrays.append(reg)
                 else:
                     registers.append(reg)
-    
+
             for cluster_node in peripheral_node.findall('./registers/cluster'):
                 cluster = self._parse_cluster(cluster_node)
                 if isinstance(cluster, SVDClusterArray):
                     cluster_arrays.append(cluster)
                 else:
                     clusters.append(cluster)
-                    print(clusters)
 
         # parse all interrupts for the peripheral
         interrupts = []
