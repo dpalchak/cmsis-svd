@@ -160,6 +160,11 @@ class SVDParser(object):
             if self.remove_reserved or 'reserved' not in node.name.lower():
                 fields.append(node)
 
+        for field_node in register_node.findall('./fields/field'):
+            node = self._parse_field(field_node)
+            if self.remove_reserved or 'reserved' not in node.name.lower():
+                fields.append(node)
+
         dim = _get_int(register_node, 'dim')
         name = _get_text(register_node, 'name')
         derived_from = _get_text(register_node, 'derivedFrom')

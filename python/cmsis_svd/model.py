@@ -284,7 +284,7 @@ class SVDRegister(SVDElement):
 
 class SVDCluster(SVDElement):
     def __init__(self, name, description, address_offset, derived_from, alternate_cluster, struct_name,
-                 size, access, protection, reset_value, reset_mask, 
+                 size, access, protection, reset_value, reset_mask,
                  registers, register_arrays, clusters, cluster_arrays):
         SVDElement.__init__(self)
 
@@ -310,13 +310,13 @@ class SVDCluster(SVDElement):
         # make parent association
         for register in self._registers:
             register.parent = self
-        
+
         for arr in self._register_arrays:
             arr.parent = self
-            
+
         for cluster in self._clusters:
             cluster.parent = self
-            
+
         for arr in self._cluster_arrays:
             arr.parent = self
 
@@ -340,7 +340,7 @@ class SVDCluster(SVDElement):
         for arr in self._lookup_possibly_derived_attribute('cluster_arrays'):
             clusters.extend(arr.clusters)
         return clusters
-            
+
     def get_derived_from(self):
         # TODO: add support for dot notation derivedFrom
         if self.derived_from is None:
@@ -354,8 +354,8 @@ class SVDCluster(SVDElement):
 
     def is_reserved(self):
         return 'reserved' in self.name.lower()
-    
-    
+
+
 class SVDClusterArray(SVDElement):
     """Represent a cluster array in the tree"""
 
@@ -389,13 +389,13 @@ class SVDClusterArray(SVDElement):
         # make parent association
         for register in self._registers:
             register.parent = self
-        
+
         for arr in self._register_arrays:
             arr.parent = self
-            
+
         for cluster in self._clusters:
             cluster.parent = self
-            
+
         for arr in self._cluster_arrays:
             arr.parent = self
 
